@@ -1,15 +1,6 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// Create a pool to connect to the default 'postgres' database first to create our app database if needed
-const initPool = new Pool({
-    user: process.env.PGUSER,
-    host: process.env.PGHOST,
-    password: process.env.PGPASSWORD,
-    port: process.env.PGPORT,
-    database: 'postgres' // connect to default database to create new one
-});
-
 const appPool = new Pool({
     user: process.env.PGUSER,
     host: process.env.PGHOST,
@@ -20,19 +11,7 @@ const appPool = new Pool({
 
 async function initializeDB() {
     try {
-        console.log(`Ensuring database '${process.env.PGDATABASE}' exists...`);
-        const res = await initPool.query(`SELECT datname FROM pg_catalog.pg_database WHERE datname = '${process.env.PGDATABASE}'`);
-        
-        if (res.rowCount === 0) {
-            console.log(`Database '${process.env.PGDATABASE}' not found, creating it...`);
-            await initPool.query(`CREATE DATABASE "${process.env.PGDATABASE}"`);
-            console.log("Database created successfully.");
-        } else {
-            console.log("Database already exists.");
-        }
-        await initPool.end();
-
-        console.log("Connecting to application database to create tables...");
+        console.log(`Connecting to application database '${process.env.PGDATABASE}' to create tables...`);
         // Create tables
         await appPool.query(`
             CREATE TABLE IF NOT EXISTS users (
