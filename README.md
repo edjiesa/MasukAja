@@ -12,7 +12,7 @@ MasukAja adalah aplikasi pengelola kata sandi (Password Manager) berbasis web ya
 ## 🚀 Teknologi yang Digunakan
 - **Backend**: Node.js, Express.js
 - **Database**: PostgreSQL (menggunakan modul `pg`)
-- **Autentikasi & Sesi**: `express-session`, `cookie-parser`, `bcrypt`
+- **Autentikasi & Sesi**: `express-session`, `cookie-parser`, `bcryptjs`
 - **Frontend / View Engine**: EJS, Tailwind CSS, Alpine.js (opsional)
 
 ---
@@ -39,11 +39,13 @@ MasukAja adalah aplikasi pengelola kata sandi (Password Manager) berbasis web ya
      PGPASSWORD=password_postgres_anda
      PGDATABASE=password_manager
      PGPORT=5432
+     BASE_URI=
      ```
+     *(Catatan: Biarkan `BASE_URI` kosong jika Anda menjalankan aplikasi di localhost root `/`)*
 4. **Inisialisasi Database**:
-   - Jalankan perintah berikut untuk membuat database dan tabel secara otomatis:
+   - Jalankan perintah berikut untuk membuat tabel secara otomatis (pastikan database `password_manager` sudah Anda buat secara manual di PostgreSQL):
      ```bash
-     npm run init-db
+     node scripts/init-db.js
      ```
 5. **Jalankan Aplikasi**:
    ```bash
@@ -93,15 +95,15 @@ Untuk mengunggah dan menjalankan aplikasi Node.js ini di hosting cPanel, ikuti l
    PGPASSWORD=password_database_cpanel_anda
    PGDATABASE=namahost_password_manager
    PGPORT=5432
+   BASE_URI=/masukaja_app
    ```
-*(Catatan: cPanel biasanya menggunakan `127.0.0.1` atau `localhost` untuk host database).*
+*(Catatan: cPanel biasanya menggunakan `127.0.0.1` untuk host database. Ubah nilai `BASE_URI` sesuai dengan nama sub-folder atau path URL tempat aplikasi Anda diakses. Misalnya, jika diakses melalui `domain.com/MasukAja`, isi dengan `BASE_URI=/MasukAja`. Jika di root domain, biarkan kosong `BASE_URI=`)*
 
 ### Langkah 5: Instalasi NPM dan Inisialisasi Database
 1. Kembali ke halaman **Setup Node.js App**.
 2. Scroll ke bawah dan klik tombol **Run NPM Install** untuk menginstal semua dependensi dari `package.json`.
-3. Untuk menjalankan script inisialisasi database (`init-db.js`), cPanel menyediakan baris perintah virtual *(Enter to the virtual environment)* di bagian atas halaman Node.js App.
-4. Salin *command virtual environment* tersebut, lalu buka menu **Terminal** di cPanel, tempel dan tekan Enter.
-5. Jalankan perintah `npm run init-db` untuk membuat tabel di dalam database cPanel Anda.
+3. Buka menu **Terminal** di cPanel, lalu navigasi ke folder aplikasi Anda (misal: `cd /home/user/nodevenv/masukaja_app/22/`).
+4. Jalankan perintah `node scripts/init-db.js` untuk membuat tabel di dalam database cPanel Anda. *(Catatan: Jangan gunakan `npm run init-db` di cPanel untuk menghindari batasan memori yang menyebabkan `core dumped`)*.
 
 ### Langkah 6: Restart Aplikasi
 1. Kembali ke halaman **Setup Node.js App**.
