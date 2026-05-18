@@ -32,39 +32,43 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
 // --- Middleware ---
+const basePath = process.env.BASE_URI || '';
+
 // Authentication Middleware
 const requireAuth = (req, res, next) => {
     if (req.session && req.session.userId) {
         return next();
     }
-    res.redirect('/login');
+    res.redirect(basePath + '/login');
 };
 
-// Pass user info to views
+// Pass user info and baseUrl to views
 app.use((req, res, next) => {
     res.locals.user = req.session.username || null;
     res.locals.error = null;
+    res.locals.baseUrl = basePath;
     next();
 });
 
 // --- Routes ---
+const router = express.Router();
 
 // Redirect root to dashboard or login
-app.get('/', (req, res) => {
+router.get('/', (req, res) => {
     if (req.session.userId) {
-        res.redirect('/dashboard');
+        res.redirect(basePath + '/dashboard');
     } else {
-        res.redirect('/login');
+        res.redirect(basePath + '/login');
     }
 });
 
 // Register
-app.get('/register', (req, res) => {
-    if (req.session.userId) return res.redirect('/dashboard');
+router.get('/register', (req, res) => {
+    if (req.session.userId) return res.redirect(basePath + '/dashboard');
     res.render('register');
 });
 
-app.post('/register', async (req, res) => {
+router.post('/register', async (req, res) => {
     const { username, password } = req.body;
 
     try {
@@ -81,7 +85,7 @@ app.post('/register', async (req, res) => {
         // Save user
         await db.query('INSERT INTO users (username, password_hash) VALUES ($1, $2)', [username, hashedPassword]);
 
-        res.redirect('/login');
+        res.redirect(basePath + '/login');
     } catch (err) {
         console.error(err);
         res.render('register', { error: 'Server error during registration.' });
@@ -89,12 +93,12 @@ app.post('/register', async (req, res) => {
 });
 
 // Login
-app.get('/login', (req, res) => {
-    if (req.session.userId) return res.redirect('/dashboard');
+router.get('/login', (req, res) => {
+    if (req.session.userId) return res.redirect(basePath + '/dashboard');
     res.render('login');
 });
 
-app.post('/login', async (req, res) => {
+router.post('/login', async (req, res) => {
     const { username, password, rememberMe } = req.body;
 
     try {
@@ -115,7 +119,7 @@ app.post('/login', async (req, res) => {
                 req.session.cookie.expires = false;
             }
 
-            res.redirect('/dashboard');
+            res.redirect(basePath + '/dashboard');
         } else {
             res.render('login', { error: 'Invalid username or password.' });
         }
@@ -126,7 +130,7 @@ app.post('/login', async (req, res) => {
 });
 
 // Dashboard (Protected)
-app.get('/dashboard', requireAuth, async (req, res) => {
+router.get('/dashboard', requireAuth, async (req, res) => {
     try {
         // Fetch user's stored passwords
         const result = await db.query('SELECT * FROM stored_passwords WHERE user_id = $1 ORDER BY created_at DESC', [req.session.userId]);
@@ -139,14 +143,14 @@ app.get('/dashboard', requireAuth, async (req, res) => {
 });
 
 // Add Password
-app.post('/passwords/add', requireAuth, async (req, res) => {
+router.post('/passwords/add', requireAuth, async (req, res) => {
     const { appName, appUsername, appPassword } = req.body;
     try {
         await db.query(
             'INSERT INTO stored_passwords (user_id, app_name, app_username, app_password) VALUES ($1, $2, $3, $4)',
             [req.session.userId, appName, appUsername, appPassword]
         );
-        res.redirect('/dashboard');
+        res.redirect(basePath + '/dashboard');
     } catch (err) {
         console.error(err);
         res.status(500).send('Server error');
@@ -154,10 +158,10 @@ app.post('/passwords/add', requireAuth, async (req, res) => {
 });
 
 // Delete Password
-app.post('/passwords/delete/:id', requireAuth, async (req, res) => {
+router.post('/passwords/delete/:id', requireAuth, async (req, res) => {
     try {
         await db.query('DELETE FROM stored_passwords WHERE id = $1 AND user_id = $2', [req.params.id, req.session.userId]);
-        res.redirect('/dashboard');
+        res.redirect(basePath + '/dashboard');
     } catch (err) {
         console.error(err);
         res.status(500).send('Server error');
@@ -165,13 +169,19 @@ app.post('/passwords/delete/:id', requireAuth, async (req, res) => {
 });
 
 // Logout
-app.get('/logout', (req, res) => {
+router.get('/logout', (req, res) => {
     req.session.destroy((err) => {
         if (err) console.error('Error destroying session:', err);
         res.clearCookie('connect.sid'); // Clear the session cookie
-        res.redirect('/login');
+        res.redirect(basePath + '/login');
     });
 });
+
+// Mount the router on the root, but handle Passenger subfolder paths by using a wildcard fallback
+app.use('/', router);
+if (basePath) {
+    app.use(basePath, router);
+}
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
