@@ -129,6 +129,36 @@ router.post('/login', async (req, res) => {
     }
 });
 
+// Forgot Password
+router.get('/forgot-password', (req, res) => {
+    if (req.session.userId) return res.redirect(basePath + '/dashboard');
+    res.render('forgot-password');
+});
+
+router.post('/forgot-password', async (req, res) => {
+    const { username, newPassword } = req.body;
+
+    try {
+        // Check if user exists
+        const result = await db.query('SELECT * FROM users WHERE username = $1', [username]);
+        if (result.rows.length === 0) {
+            return res.render('forgot-password', { error: 'Username not found.' });
+        }
+
+        // Hash new password
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+        // Update password in db
+        await db.query('UPDATE users SET password_hash = $1 WHERE username = $2', [hashedPassword, username]);
+
+        res.render('login', { error: 'Password reset successful! Please log in.' });
+    } catch (err) {
+        console.error(err);
+        res.render('forgot-password', { error: 'Server error during password reset.' });
+    }
+});
+
 // Dashboard (Protected)
 router.get('/dashboard', requireAuth, async (req, res) => {
     try {
