@@ -7,6 +7,7 @@ MasukAja adalah aplikasi pengelola kata sandi (Password Manager) berbasis web ya
 - **Auto-Login (Remember Me)**: Sesi login yang persisten hingga 30 hari menggunakan cookie yang aman.
 - **Manajemen Sandi**: Tambah dan hapus kata sandi aplikasi/website Anda di dalam *Vault* yang terenkripsi.
 - **Generator Sandi**: Fitur pembuat kata sandi acak yang sangat kuat dengan sekali klik.
+- **Lupa Password via Email**: Fitur reset password yang aman menggunakan token sekali pakai yang dikirimkan ke email pendaftaran.
 - **UI/UX Modern**: Desain *Glassmorphism* dengan tema gelap (Dark Mode) bawaan untuk kenyamanan mata.
 
 ## 🚀 Teknologi yang Digunakan
@@ -40,6 +41,13 @@ MasukAja adalah aplikasi pengelola kata sandi (Password Manager) berbasis web ya
      PGDATABASE=password_manager
      PGPORT=5432
      BASE_URI=
+
+     # Konfigurasi SMTP untuk Pengiriman Email Lupa Password
+     SMTP_HOST=smtp.nama_host_anda.com
+     SMTP_PORT=587
+     SMTP_USER=email@domainanda.com
+     SMTP_PASS=password_email_anda
+     SMTP_FROM="MasukAja <email@domainanda.com>"
      ```
      *(Catatan: Biarkan `BASE_URI` kosong jika Anda menjalankan aplikasi di localhost root `/`)*
 4. **Inisialisasi Database**:
@@ -96,14 +104,22 @@ Untuk mengunggah dan menjalankan aplikasi Node.js ini di hosting cPanel, ikuti l
    PGDATABASE=namahost_password_manager
    PGPORT=5432
    BASE_URI=/masukaja_app
+
+   # Konfigurasi SMTP (Gunakan Akun Email cPanel Anda)
+   SMTP_HOST=mail.domainanda.com
+   SMTP_PORT=587
+   SMTP_USER=email@domainanda.com
+   SMTP_PASS=password_email_anda
+   SMTP_FROM="MasukAja <email@domainanda.com>"
    ```
-*(Catatan: cPanel biasanya menggunakan `127.0.0.1` untuk host database. Ubah nilai `BASE_URI` sesuai dengan nama sub-folder atau path URL tempat aplikasi Anda diakses. Misalnya, jika diakses melalui `domain.com/MasukAja`, isi dengan `BASE_URI=/MasukAja`. Jika di root domain, biarkan kosong `BASE_URI=`)*
+*(Catatan: cPanel biasanya menggunakan `127.0.0.1` untuk host database. Ubah nilai `BASE_URI` sesuai dengan nama sub-folder atau path URL tempat aplikasi Anda diakses. Misalnya, jika diakses melalui `domain.com/MasukAja`, isi dengan `BASE_URI=/MasukAja`. Jika di root domain, biarkan kosong `BASE_URI=`. Untuk SMTP, Anda dapat membuat akun email di fitur **Email Accounts** cPanel Anda dan menggunakan detailnya di atas)*
 
 ### Langkah 5: Instalasi NPM dan Inisialisasi Database
 1. Kembali ke halaman **Setup Node.js App**.
 2. Scroll ke bawah dan klik tombol **Run NPM Install** untuk menginstal semua dependensi dari `package.json`.
 3. Buka menu **Terminal** di cPanel, lalu navigasi ke folder aplikasi Anda (misal: `cd /home/user/nodevenv/masukaja_app/22/`).
-4. Jalankan perintah `node scripts/init-db.js` untuk membuat tabel di dalam database cPanel Anda. *(Catatan: Jangan gunakan `npm run init-db` di cPanel untuk menghindari batasan memori yang menyebabkan `core dumped`)*.
+4. Jika ini adalah instalasi **baru**, jalankan: `node scripts/init-db.js` untuk membuat tabel. 
+5. Jika ini adalah **update** dari versi sebelumnya, jalankan: `node scripts/update-db.js` untuk menambahkan kolom email tanpa menghapus data lama. *(Catatan: Jangan gunakan `npm run init-db` di cPanel untuk menghindari batasan memori yang menyebabkan `core dumped`)*.
 
 ### Langkah 6: Restart Aplikasi
 1. Kembali ke halaman **Setup Node.js App**.
