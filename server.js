@@ -4,7 +4,18 @@ const session = require('express-session');
 const cookieParser = require('cookie-parser');
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const db = require('./db');
+
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT,
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+    }
+});
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -69,13 +80,13 @@ router.get('/register', (req, res) => {
 });
 
 router.post('/register', async (req, res) => {
-    const { username, password } = req.body;
+    const { username, email, password } = req.body;
 
     try {
         // Check if user exists
-        const userExists = await db.query('SELECT * FROM users WHERE username = $1', [username]);
+        const userExists = await db.query('SELECT * FROM users WHERE username = $1 OR email = $2', [username, email]);
         if (userExists.rows.length > 0) {
-            return res.render('register', { error: 'Username already taken.' });
+            return res.render('register', { error: 'Username or email already taken.' });
         }
 
         // Hash password
@@ -83,7 +94,7 @@ router.post('/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
         // Save user
-        await db.query('INSERT INTO users (username, password_hash) VALUES ($1, $2)', [username, hashedPassword]);
+        await db.query('INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3)', [username, email, hashedPassword]);
 
         res.redirect(basePath + '/login');
     } catch (err) {
@@ -136,26 +147,73 @@ router.get('/forgot-password', (req, res) => {
 });
 
 router.post('/forgot-password', async (req, res) => {
-    const { username, newPassword } = req.body;
+    const { email } = req.body;
 
     try {
         // Check if user exists
-        const result = await db.query('SELECT * FROM users WHERE username = $1', [username]);
+        const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
         if (result.rows.length === 0) {
-            return res.render('forgot-password', { error: 'Username not found.' });
+            // Do not reveal if email exists or not
+            return res.render('login', { error: 'If the email exists, a reset link has been sent.' });
         }
+
+        const user = result.rows[0];
+
+        // Generate token
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const tokenExpires = Date.now() + 3600000; // 1 hour
+
+        // Save token to db
+        await db.query('UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3', [resetToken, tokenExpires, user.id]);
+
+        // Send email
+        const resetUrl = `http://${req.headers.host}${basePath}/reset-password?token=${resetToken}`;
+        const mailOptions = {
+            from: process.env.SMTP_FROM || 'noreply@masukaja.com',
+            to: email,
+            subject: 'Password Reset Request',
+            text: `You requested a password reset. Click the following link to reset your password: \n\n${resetUrl}\n\nIf you did not request this, please ignore this email.`
+        };
+
+        await transporter.sendMail(mailOptions);
+
+        res.render('login', { error: 'If the email exists, a reset link has been sent.' });
+    } catch (err) {
+        console.error(err);
+        res.render('forgot-password', { error: 'Server error during password reset request.' });
+    }
+});
+
+// Reset Password
+router.get('/reset-password', (req, res) => {
+    if (req.session.userId) return res.redirect(basePath + '/dashboard');
+    const { token } = req.query;
+    if (!token) return res.redirect(basePath + '/login');
+    res.render('reset-password', { token });
+});
+
+router.post('/reset-password', async (req, res) => {
+    const { token, newPassword } = req.body;
+
+    try {
+        const result = await db.query('SELECT * FROM users WHERE reset_token = $1 AND reset_token_expires > $2', [token, Date.now()]);
+        if (result.rows.length === 0) {
+            return res.render('login', { error: 'Password reset token is invalid or has expired.' });
+        }
+        
+        const user = result.rows[0];
 
         // Hash new password
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
 
-        // Update password in db
-        await db.query('UPDATE users SET password_hash = $1 WHERE username = $2', [hashedPassword, username]);
+        // Update password and clear token
+        await db.query('UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL WHERE id = $2', [hashedPassword, user.id]);
 
         res.render('login', { error: 'Password reset successful! Please log in.' });
     } catch (err) {
         console.error(err);
-        res.render('forgot-password', { error: 'Server error during password reset.' });
+        res.render('login', { error: 'Server error during password reset.' });
     }
 });
 
