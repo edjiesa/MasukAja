@@ -167,7 +167,8 @@ router.post('/forgot-password', async (req, res) => {
         await db.query('UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3', [resetToken, tokenExpires, user.id]);
 
         // Send email
-        const resetUrl = `http://${req.headers.host}${basePath}/reset-password?token=${resetToken}`;
+        const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+        const resetUrl = `${protocol}://${req.headers.host}${basePath}/reset-password?token=${resetToken}`;
         const mailOptions = {
             from: process.env.SMTP_FROM || 'noreply@masukaja.com',
             to: email,
